@@ -1,4 +1,4 @@
-struct credentials {
-  String ssid;
-  String pass;
-};
+typedef struct {
+  char* ssid;
+  char* pass;
+} Credentials;

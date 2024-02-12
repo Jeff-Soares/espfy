@@ -42,7 +42,7 @@ void setup() {
 
 void loop() {
   int packetSize = Udp.parsePacket();
-  
+
   if (packetSize) {
     Serial.printf("Received packet of size %d from %s:%d\n", packetSize, Udp.remoteIP().toString().c_str(), Udp.remotePort());
 
@@ -74,14 +74,14 @@ void saveCredentials(String ssid, String pass) {
   saveString(pass.c_str(), 2 + ssid.length());
 }
 
-struct credentials getCredentials() {
-  credentials cred;
-
+Credentials getCredentials() {
   int ssidLength = (int) EEPROM.read(0);
   int passLength = (int) EEPROM.read(1);
 
-  cred.ssid = readString(2, ssidLength);
-  cred.pass = readString(2 + ssidLength, passLength);
+  Credentials cred = {
+    readString(2, ssidLength),
+    readString(2 + ssidLength, passLength)
+  };
 
   return cred;
 }
@@ -96,9 +96,10 @@ void saveString(const char* str, int address) {
 }
 
 char* readString(int address, int size) {
-  char buffer[size];
+  char buffer[size + 1];
   for (int i = 0; i < size; i++) {
     buffer[i] = EEPROM.read(address + i);
   }
-  return buffer;
+  buffer[size] = '\0';
+  return strdup(buffer);
 }
