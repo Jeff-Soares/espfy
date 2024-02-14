@@ -1,7 +1,7 @@
 #include <ESP8266WiFi.h>
 #include <WiFiUdp.h>
 #include <EEPROM.h>
-#include "types.h"
+#include "src\Credentials.h"
 
 const char* ssid = "your-ssid";
 const char* pass = "your-password";
