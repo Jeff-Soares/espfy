@@ -1,10 +1,11 @@
+#include <WiFiManager.h> // https://github.com/tzapu/WiFiManager
 #include <ESP8266WiFi.h>
 #include <WiFiUdp.h>
 #include <EEPROM.h>
 #include "src\Credentials.h"
 
-const char* ssid = "your-ssid";
-const char* pass = "your-password";
+#define TRIGGER_PIN 2
+
 const unsigned int port = 8888;
 
 char packetBuffer[UDP_TX_PACKET_MAX_SIZE + 1];
@@ -14,21 +15,44 @@ WiFiUDP Udp;
 
 void setup() {
   Serial.begin(115200);
-  Serial.println("Connecting");
+  EEPROM.begin(128);
+  pinMode(TRIGGER_PIN, INPUT_PULLUP);
+
+  Serial.println("\nStarting");
+  // Delay because some ESP-01 pins needs to be HIGH at boot
+  delay(5000);
 
   WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, pass);
 
-  while (WiFi.status() != WL_CONNECTED) {
-    Serial.print(".");
-    delay(500);
+  if (digitalRead(TRIGGER_PIN) == LOW) {
+    WiFiManager wifiManager;
+
+    if (!wifiManager.startConfigPortal("OnDemandAP")) {
+      Serial.println("failed to connect and hit timeout");
+      delay(3000);
+      ESP.restart();
+      delay(5000);
+    }
+
+    while (WiFi.status() != WL_CONNECTED) {
+      Serial.print(".");
+      delay(500);
+    }
+
+    saveCredentials(WiFi.SSID(), WiFi.psk());
+  } else {
+    Credentials cred = getCredentials();
+
+    WiFi.begin(cred.ssid, cred.pass);
+
+    while (WiFi.status() != WL_CONNECTED) {
+      Serial.print(".");
+      delay(500);
+    }
   }
 
   Serial.print("Connected! IP address: ");
   Serial.println(WiFi.localIP());
-
-  Udp.begin(port);
-  Serial.printf("UDP server on port %d\n", port);
 
   configTime(-3 * 3600, 0, "pool.ntp.br", "pool.ntp.org");
 
@@ -38,6 +62,11 @@ void setup() {
 
   Serial.print("Current time: ");
   Serial.println(asctime(localtime(&now)));
+
+  Udp.begin(port);
+  Serial.printf("UDP server on port %d\n", port);
+
+  EEPROM.end();
 }
 
 void loop() {
@@ -58,13 +87,9 @@ void loop() {
 }
 
 void saveCredentials(String ssid, String pass) {
-  int ssidLength = (int) EEPROM.read(0);
-  int passLength = (int) EEPROM.read(1);
+  Credentials _cred = getCredentials();
 
-  String _ssid = readString(2, ssidLength);
-  String _pass = readString(2 + ssidLength, passLength);
-
-  if (ssid.equals(_ssid) && pass.equals(_pass)) {
+  if (ssid.equals(_cred.ssid) && pass.equals(_cred.pass)) {
     return;
   }
 
@@ -79,8 +104,8 @@ Credentials getCredentials() {
   int passLength = (int) EEPROM.read(1);
 
   Credentials cred = {
-    readString(2, ssidLength),
-    readString(2 + ssidLength, passLength)
+    ssid: readString(2, ssidLength),
+    pass: readString(2 + ssidLength, passLength)
   };
 
   return cred;
